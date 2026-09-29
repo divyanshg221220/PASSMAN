@@ -1,108 +1,141 @@
-# Passman — Password Strength & Breach-Pattern Checker
+# PASSMAN — CLI Password Manager & Security Tool
 
-A browser extension (Chrome/Edge/Brave, Manifest V3) that scores password
-strength from real entropy math instead of regex rules, and checks passwords
-against a small local list of commonly leaked/breached passwords — entirely
-on-device, with zero permissions and zero network calls.
-
-## Install (load unpacked)
-
-1. Open `chrome://extensions` (or `edge://extensions`, `brave://extensions`).
-2. Enable **Developer mode** (top right).
-3. Click **Load unpacked** and select this `passman/` folder.
-4. Pin the Passman icon to your toolbar if you want the popup handy.
-
-That's it — no build step, no dependencies.
-
-## What it does
-
-- **Popup tester**: click the toolbar icon, paste any password, and see its
-  entropy in bits, character-pool size, breach-list status, and any
-  predictable pattern it contains.
-- **Live page checker**: a content script watches every
-  `<input type="password">` on any page you visit. While you type, a small
-  badge appears under the field showing the same strength/breach verdict —
-  useful for judging a password *while signing up*, not after.
-
-Both surfaces call the exact same scoring function (`common.js`), so they
-never disagree.
-
-## Why entropy, and not regex rules
-
-A composition rule like "at least one uppercase letter, one digit, one
-symbol" only checks whether a character class is *present*. It scores
-`Passw0rd!` the same as a truly random 9-character string with the same
-classes — but `Passw0rd!` is one of the first few thousand guesses in any
-real cracking dictionary, because humans overwhelmingly build passwords the
-same predictable way (capitalize the first letter, append a couple of
-digits, tack on `!`).
-
-Entropy instead asks a different, more useful question: **given the
-character classes a password draws from, how large is the space of equally
-likely passwords an attacker has to search?**
-
-```
-pool  = size of the character set in play (lowercase=26, +uppercase=26, +digits=10, +symbols=33, ...)
-bits  = length × log2(pool)
+```text
+ _______  _______  _______  _______  __   __  _______  __    _
+|       ||   _   ||       ||       ||  |_|  ||   _   ||  |  | |
+|    _  ||  |_|  ||  _____||  _____||       ||  |_|  ||   |_| |
+|   |_| ||       || |_____ | |_____ |       ||       ||       |
+|    ___||       ||_____  ||_____  ||       ||       ||  _    |
+|   |    |   _   | _____| | _____| || ||_|| ||   _   || | |   |
+|___|    |__| |__||_______||_______||_|   |_||__| |__||_|  |__|
 ```
 
-That number of bits is what actually predicts brute-force cost — doubling
-it roughly squares the search space. It naturally rewards length (which
-regex rules under-value) and doesn't over-reward "has a symbol somewhere"
-on an otherwise short password.
+**PASSMAN** is an interactive, privacy-focused Python Command-Line Interface (CLI) security tool. It provides offline password breach checking against known compromised password datasets, mathematically computes password entropy, generates cryptographically strong passwords, and provides instant strength assessments—all with **zero network dependencies** and **zero external package requirements**.
 
-Pure keyspace entropy still has a blind spot, though: it assumes every
-character was chosen independently at random, which over-scores patterned
-passwords like `Password123!` or `qwertyuiop`. Passman corrects for that in
-two ways before producing a final verdict:
+---
 
-1. **Pattern penalties** — sequential runs (`1234`, `abcd`), repeated
-   characters (`aaaa`), keyboard walks (`qwerty`, `asdf`), and the generic
-   "Word + digits (+ symbol)" shape each subtract bits from the raw entropy
-   score, because they shrink the *real* search space a cracker needs to try.
-2. **Local breach-list matching** — checked against a bundled list of
-   passwords that dominate public breach-corpus frequency studies (plus
-   leet-speak variants and "known-word + trailing digits" shapes like
-   `dragon99`). A match effectively caps the score regardless of raw
-   entropy, since these are guessed near-instantly in practice.
+## 🚀 Key Features
 
-## Local breach list, not a live lookup
+* **🛡️ Password Breach Checker**: Instantly verifies if a password exists within a local database of commonly leaked passwords (`Common passwords.txt`).
+* **🎲 Secure Password Generator**: Creates random passwords based on customizable criteria (length, uppercase, lowercase, numbers, special characters). Automatically ensures generated passwords are non-compromised.
+* **📊 Entropy-Based Strength Calculator**: Evaluates password resilience using real mathematical entropy ($E = L \times \log_2 N$) rather than superficial pattern rules.
+* **🎨 Interactive Color-Coded Terminal UI**: Features a menu-driven interface with clear visual feedback (Red for compromised/weak, Yellow for medium, Green for safe/strong).
+* **🔒 100% Offline & Private**: Runs entirely on your local machine with zero external HTTP requests, ensuring credentials are never exposed.
 
-The brief specifically calls for a **small public/local password list**
-rather than an online breach-checking API — `breach-data.js` bundles a few
-hundred of the most consistently common passwords from public breach
-frequency studies, as a flat array. This keeps the extension:
+---
 
-- **Private** — no password is ever sent anywhere, including to a "have I
-  been pwned"-style API; everything happens in the content script /
-  popup's own JS.
-- **Permission-free** — the manifest requests zero permissions and makes
-  zero network requests, so nothing to review or trust beyond "does this
-  code do what it says."
-- **Offline-capable** — works with no connectivity.
+## 🧮 How Entropy Scoring Works
 
-It is deliberately *not* a substitute for a full breach corpus — it's a
-fast local check against the passwords attackers try first, matching the
-spirit of the assignment rather than shipping a multi-gigabyte dataset.
+Unlike basic regex checkers that only look for character inclusion (e.g., "must contain a digit and symbol"), PASSMAN measures password strength through **information entropy in bits**.
 
-## File layout
+The formula used is:
+$$E = L \times \log_2(N)$$
 
+Where:
+* **$L$** = Length of the password.
+* **$N$** = Total pool size of character sets present in the password:
+  * Lowercase letters (`a-z`): $+26$
+  * Uppercase letters (`A-Z`): $+26$
+  * Digits (`0-9`): $+10$
+  * Special characters / Punctuation: $+32$
+
+### Strength Rating Scale
+
+| Entropy (Bits) | Strength Rating | Visual Indicator | Search Space Complexity |
+| :--- | :--- | :--- | :--- |
+| **< 28 bits** | **Very Weak** | 🔴 Red | High vulnerability to brute-force attacks |
+| **28 – 35 bits** | **Weak** | 🔴 Red | Low brute-force resistance |
+| **36 – 59 bits** | **Medium** | 🟡 Yellow | Moderate protection against online guessing |
+| **60 – 126 bits** | **Strong** | 🟢 Green | High resistance to offline cracking |
+| **≥ 127 bits** | **Very Strong** | 🟢 Green | Cryptographic grade security |
+
+---
+
+## 📋 Prerequisites
+
+* **Python 3.6+** installed on your system.
+* Standard Python modules used: `random`, `math`, `string` (built-in, no `pip install` required).
+
+---
+
+## 🛠️ Quick Start & Installation
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/divyanshg221220/PASSMAN-PASSWORD-MANAGER.git
+   cd PASSMAN-PASSWORD-MANAGER
+   ```
+
+2. **Run PASSMAN**:
+   ```bash
+   python passman.py
+   ```
+
+---
+
+## 💻 Usage & Menu Options
+
+Launch `passman.py` to open the main interactive menu:
+
+```text
+===========================================================================
+
+     _______  _______  _______  _______  __   __  _______  __    _
+    |       ||   _   ||       ||       ||  |_|  ||   _   ||  |  | |
+    |    _  ||  |_|  ||  _____||  _____||       ||  |_|  ||   |_| |
+    |   |_| ||       || |_____ | |_____ |       ||       ||       |
+    |    ___||       ||_____  ||_____  ||       ||       ||  _    |
+    |   |    |   _   | _____| | _____| || ||_|| ||   _   || | |   |
+    |___|    |__| |__||_______||_______||_|   |_||__| |__||_|  |__|
+        
+===========================================================================
+1. PASSWORD BREACH CHECKER
+2. PASSWORD GENERATOR
+3. PASSWORD STRENGTH TESTER
+4. EXIT
+===========================================================================
 ```
-passman/
-├── manifest.json     # MV3 manifest — popup + content script, no permissions
-├── common.js          # entropy math, pattern detection, breach matching (shared)
-├── breach-data.js      # local common-password / breach-pattern list
-├── popup.html/css/js   # toolbar popup — paste-a-password tester
-├── content.js/css      # live badge on any page's password field(s)
-└── README.md
+
+### 1. Password Breach Checker
+Checks any entered password against the local `Common passwords.txt` list.
+* Outputs **`PASSWORD IS COMPROMISED`** if found in the leak database.
+* Outputs **`PASSWORD IS SAFE`** if absent from the database.
+
+### 2. Password Generator
+Prompts for desired password specifications:
+* Password length
+* Include Uppercase letters (`Y/N`)
+* Include Lowercase letters (`Y/N`)
+* Include Numbers (`Y/N`)
+* Include Special Characters (`Y/N`)
+
+*Ensures at least one character from each selected set is included, shuffles the result, verifies it against the breach list, and displays the entropy calculation and strength rating.*
+
+### 3. Password Strength Tester
+Evaluates any user-provided string and outputs:
+* Calculated entropy in bits.
+* Color-coded strength classification.
+
+---
+
+## 📁 Project File Structure
+
+```text
+PASSMAN-PASSWORD-MANAGER/
+├── passman.py            # Main interactive CLI application & core logic
+├── Common passwords.txt  # Local database of common leaked/compromised passwords
+└── README.md             # Project documentation
 ```
 
-## Limitations
+---
 
-- The breach list is small and illustrative, not exhaustive — a password
-  not on the list isn't guaranteed safe, just not in this particular set.
-- Keyspace entropy assumes worst-case randomness within the detected
-  character classes; the pattern penalties catch the most common
-  predictable shapes but aren't an exhaustive cracking model.
-- The live badge only inspects `<input type="password">` elements; it
-  won't catch custom JS-only password widgets that don't use that input type.
+## 🔐 Security & Privacy
+
+* **Zero Data Transmission**: PASSMAN runs 100% locally. Passwords evaluated or generated are stored solely in transient memory during runtime.
+* **No External Dependencies**: Built strictly using standard Python libraries to mitigate supply chain risks.
+
+---
+
+## 📄 License
+
+This project is open-source and available under the [MIT License](LICENSE).

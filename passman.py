@@ -7,12 +7,26 @@ GREEN = "\033[32m"
 YELLOW = "\033[33m"
 RESET = "\033[0m"
 
+rng = random.SystemRandom()
+_COMMON_PASSWORDS_CACHE = None
+
+def load_common_passwords():
+    global _COMMON_PASSWORDS_CACHE
+    if _COMMON_PASSWORDS_CACHE is None:
+        try:
+            with open("Common passwords.txt", "r", encoding="utf-8") as f:
+                _COMMON_PASSWORDS_CACHE = set(line.strip() for line in f if line.strip())
+        except FileNotFoundError:
+            print(f"{YELLOW}Common passwords file not found. Skipping common password check.{RESET}")
+            _COMMON_PASSWORDS_CACHE = set()
+    return _COMMON_PASSWORDS_CACHE
+
 def ask_yes_no(prompt):
     while True:
         answer = input(prompt).strip().lower()
-        if answer == "y":
+        if answer in ("y", "yes"):
             return True
-        if answer == "n":
+        if answer in ("n", "no"):
             return False
         print(f"{YELLOW}Please enter 'y' or 'n'.{RESET}")
 
@@ -29,54 +43,51 @@ def ask_positive_int(prompt):
         return value
 
 def check_password(password):
-    try:
-        with open("Common passwords.txt", "r") as f:
-            common_passwords = f.read().splitlines()
-        if password in common_passwords:
-            return False
-        else:
-            return True
-    except FileNotFoundError:
-        print(f"{YELLOW}Common passwords file not found. Skipping common password check.{RESET}")
+    common_passwords = load_common_passwords()
+    if not common_passwords:
         return False
+    return (password in common_passwords) or (password.lower() in common_passwords)
 
 def generate_password(length, upper_case, lower_case, numbers, special_characters):
-    if (upper_case == False and lower_case == False and numbers == False and special_characters == False):
+    if not (upper_case or lower_case or numbers or special_characters):
         return False
-    else:
-        password = ""
-        character_pool = []
-        if upper_case == True:
-            character_pool.append(string.ascii_uppercase)
-        if lower_case == True:
-            character_pool.append(string.ascii_lowercase)
-        if numbers == True:
-            character_pool.append(string.digits)
-        if special_characters == True:
-            character_pool.append(string.punctuation)
-        if not character_pool or length < len(character_pool):
-            return False
-        while True:
-            chars = [random.choice(i) for i in character_pool]
-            chars += random.choices("".join(character_pool), k=length-len(character_pool))
-            random.shuffle(chars)
-            password = "".join(chars)
-            if check_password(password):
-                return password
+    character_pool = []
+    if upper_case:
+        character_pool.append(string.ascii_uppercase)
+    if lower_case:
+        character_pool.append(string.ascii_lowercase)
+    if numbers:
+        character_pool.append(string.digits)
+    if special_characters:
+        character_pool.append(string.punctuation)
+    if not character_pool or length < len(character_pool):
+        return False
+    all_chars = "".join(character_pool)
+    max_attempts = 500
+    for _ in range(max_attempts):
+        chars = [rng.choice(pool) for pool in character_pool]
+        chars += rng.choices(all_chars, k=length - len(character_pool))
+        rng.shuffle(chars)
+        password = "".join(chars)
+        if not check_password(password):
+            return password
+    return False
 
 def entropy_score(password):
     length = len(password)
+    if length == 0:
+        return 0.0
     character_pool = 0
-    if any(i in string.ascii_uppercase for i in password):
+    if any(c in string.ascii_uppercase for c in password):
         character_pool += 26
-    if any(i in string.ascii_lowercase for i in password):
+    if any(c in string.ascii_lowercase for c in password):
         character_pool += 26
-    if any(i in string.digits for i in password):
+    if any(c in string.digits for c in password):
         character_pool += 10
-    if any(i in string.punctuation for i in password):
+    if any(c in string.punctuation or c.isspace() or not c.isalnum() for c in password):
         character_pool += len(string.punctuation)
     if character_pool == 0:
-        return False
+        return 0.0
     entropy = length * math.log2(character_pool)
     return entropy
 
@@ -160,4 +171,5 @@ def main():
         else:
             print(f"{YELLOW}INVALID CHOICE{RESET}")
 
-main()
+if __name__ == "__main__":
+    main()
